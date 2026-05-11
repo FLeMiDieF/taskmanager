@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — TaskManager</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page">
+<div class="auth-box">
+    <h1 class="auth-logo">✅ TaskManager</h1>
+    <p class="auth-sub">Управляй проектами и задачами</p>
+
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('login')">Войти</button>
+        <button class="tab" onclick="showTab('register')">Регистрация</button>
+    </div>
+
+    <div id="login-form">
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="login-email" placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+            <label>Пароль</label>
+            <input type="password" id="login-password" placeholder="••••••">
+        </div>
+        <div id="login-error" class="error-msg hidden"></div>
+        <button class="btn btn-primary w-full" onclick="login()">Войти</button>
+    </div>
+
+    <div id="register-form" class="hidden">
+        <div class="form-group">
+            <label>Имя пользователя</label>
+            <input type="text" id="reg-username" placeholder="username">
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="reg-email" placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+            <label>Пароль</label>
+            <input type="password" id="reg-password" placeholder="Минимум 6 символов">
+        </div>
+        <div id="reg-error" class="error-msg hidden"></div>
+        <button class="btn btn-primary w-full" onclick="register()">Создать аккаунт</button>
+    </div>
+</div>
+
+<script src="/static/js/auth.js"></script>
+</body>
+</html>
