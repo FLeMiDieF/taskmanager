@@ -4,9 +4,17 @@ from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 DEBUG = os.environ.get("DEBUG", "True") == "True"
-ALLOWED_HOSTS = ["*"]
+
+# Railway автоматически добавляет RAILWAY_PUBLIC_DOMAIN
+_railway_host = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+ALLOWED_HOSTS = ["*"] if DEBUG else (
+    ["localhost", "127.0.0.1"] + ([_railway_host] if _railway_host else [])
+)
+
+# CSRF: разрешаем Railway-домен
+CSRF_TRUSTED_ORIGINS = ([f"https://{_railway_host}"] if _railway_host else [])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -30,6 +38,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",   # статика в продакшене
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -113,6 +122,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 TEMPLATES[0]["DIRS"] = [BASE_DIR / "templates"]
 

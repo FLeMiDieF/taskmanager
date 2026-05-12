@@ -10,5 +10,7 @@ django-celery-beat==2.6.0
 redis==5.0.7
 psycopg2-binary==2.9.9
 asgiref==3.8.1
+daphne==4.1.2
+whitenoise==6.7.0
 pytest==8.2.2
 pytest-django==4.8.0
