@@ -26,16 +26,20 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    def perform_destroy(self, instance):
+        if self.request.user != instance.owner:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Только владелец может удалить проект.")
+        instance.delete()
+
     @action(detail=True, methods=["get", "post"], url_path="members")
     def members(self, request, pk=None):
         project = self.get_object()
 
         if request.method == "GET":
-            data = UserSerializer(project.members.all(), many=True).data
-            # Добавляем владельца первым отдельно
             return Response({
                 "owner": UserSerializer(project.owner).data,
-                "members": data,
+                "members": UserSerializer(project.members.all(), many=True).data,
             })
 
         # POST — добавить участника (только владелец)
@@ -44,13 +48,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 {"detail": "Только владелец может добавлять участников."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        email = request.data.get("email", "").strip()
-        if not email:
-            return Response({"detail": "Укажите email."}, status=status.HTTP_400_BAD_REQUEST)
+        username = request.data.get("username", "").strip()
+        if not username:
+            return Response({"detail": "Укажите имя пользователя."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return Response({"detail": "Пользователь с таким email не найден."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Пользователь не найден."}, status=status.HTTP_404_NOT_FOUND)
         if user == project.owner:
             return Response({"detail": "Этот пользователь является владельцем проекта."}, status=status.HTTP_400_BAD_REQUEST)
         if project.members.filter(id=user.id).exists():
@@ -71,4 +75,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
         project.members.remove(user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="leave")
+    def leave(self, request, pk=None):
+        project = self.get_object()
+        if request.user == project.owner:
+            return Response(
+                {"detail": "Владелец не может покинуть свой проект. Удалите проект."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not project.members.filter(id=request.user.id).exists():
+            return Response({"detail": "Вы не являетесь участником этого проекта."}, status=status.HTTP_400_BAD_REQUEST)
+        project.members.remove(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

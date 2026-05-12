@@ -82,6 +82,7 @@ body { background: var(--bg); color: var(--text); font-family: Arial, sans-serif
 .project-card h2 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .project-card p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
 .project-card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); }
+.project-card-actions { margin-top: 0.8rem; display: flex; justify-content: flex-end; }
 
 /* Board */
 .board-header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }

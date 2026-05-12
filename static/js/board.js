@@ -75,13 +75,12 @@ function renderMembersModal() {
         </div>
     `).join('') || '<p class="empty-col">Участников пока нет</p>';
 
-    // Показать/скрыть секцию приглашения
-    const inviteSection = document.getElementById('invite-section');
-    if (isOwner) {
-        inviteSection.classList.remove('hidden');
-    } else {
-        inviteSection.classList.add('hidden');
-    }
+    // Показать/скрыть секцию приглашения (только владелец)
+    document.getElementById('invite-section').classList.toggle('hidden', !isOwner);
+
+    // Кнопка "Покинуть" — только для участников (не владелец)
+    const isMember = me && projectMembers.some(u => u.id === me.id);
+    document.getElementById('leave-btn').classList.toggle('hidden', !isMember);
 }
 
 function populateAssigneeSelects() {
@@ -97,15 +96,15 @@ function populateAssigneeSelects() {
 }
 
 async function inviteMember() {
-    const email = document.getElementById('invite-email').value.trim();
+    const username = document.getElementById('invite-username').value.trim();
     const errEl = document.getElementById('invite-error');
     const okEl = document.getElementById('invite-success');
     errEl.classList.add('hidden');
     okEl.classList.add('hidden');
 
-    if (!email) { errEl.textContent = 'Введите email'; errEl.classList.remove('hidden'); return; }
+    if (!username) { errEl.textContent = 'Введите имя пользователя'; errEl.classList.remove('hidden'); return; }
 
-    const res = await api('POST', `/api/projects/${projectId}/members/`, { email });
+    const res = await api('POST', `/api/projects/${projectId}/members/`, { username });
     const data = await res.json();
 
     if (!res.ok) {
@@ -116,8 +115,14 @@ async function inviteMember() {
 
     okEl.textContent = `${data.username} добавлен в проект`;
     okEl.classList.remove('hidden');
-    document.getElementById('invite-email').value = '';
+    document.getElementById('invite-username').value = '';
     await loadMembers();
+}
+
+async function leaveProject() {
+    if (!confirm('Покинуть проект?')) return;
+    const res = await api('POST', `/api/projects/${projectId}/leave/`);
+    if (res.ok) location.href = '/';
 }
 
 async function removeMember(userId) {

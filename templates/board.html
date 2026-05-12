@@ -133,14 +133,20 @@
         <div id="invite-section" class="invite-section hidden">
             <div class="invite-divider">Добавить участника</div>
             <div class="invite-row">
-                <input type="email" id="invite-email" placeholder="Email пользователя" autocomplete="off">
+                <input type="text" id="invite-username" placeholder="Имя пользователя" autocomplete="off">
                 <button class="btn btn-primary btn-sm" onclick="inviteMember()">Добавить</button>
             </div>
             <div id="invite-error" class="error-msg hidden"></div>
             <div id="invite-success" class="success-msg hidden"></div>
         </div>
 
+        <!-- Покинуть проект (только для участников) -->
+        <div id="leave-section" class="hidden">
+            <div class="invite-divider"></div>
+        </div>
+
         <div class="modal-footer">
+            <button id="leave-btn" class="btn btn-danger btn-sm hidden" onclick="leaveProject()">🚪 Покинуть проект</button>
             <button class="btn btn-outline" onclick="closeModal('members-modal')">Закрыть</button>
         </div>
     </div>
