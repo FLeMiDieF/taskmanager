@@ -59,16 +59,22 @@ TEMPLATES = [{"BACKEND": "django.template.backends.django.DjangoTemplates",
                    "django.contrib.messages.context_processors.messages",
                ]}}]
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "taskmanager"),
-        "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+# Railway автоматически даёт DATABASE_URL — используем его в первую очередь
+_db_url = os.environ.get("DATABASE_URL", "")
+if _db_url:
+    import dj_database_url
+    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("DB_NAME", "taskmanager"),
+            "USER": os.environ.get("DB_USER", "postgres"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
+            "HOST": os.environ.get("DB_HOST", "localhost"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+        }
     }
-}
 
 AUTH_USER_MODEL = "users.User"
 
