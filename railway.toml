@@ -1,8 +1,8 @@
-[build]
+﻿[build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "sh -c 'python manage.py makemigrations users projects tasks notifications && python manage.py migrate && python manage.py collectstatic --noinput --clear 2>/dev/null || true && daphne -b 0.0.0.0 -p ${PORT:-8000} config.asgi:application'"
+startCommand = "sh -c 'python manage.py migrate --fake-initial && python manage.py migrate && python manage.py collectstatic --noinput --clear 2>/dev/null || true && daphne -b 0.0.0.0 -p ${PORT:-8000} config.asgi:application'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5

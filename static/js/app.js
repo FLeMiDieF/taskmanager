@@ -43,6 +43,7 @@ function formatDeadline(d) {
 // Показываем имя пользователя в навбаре
 window.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('nav-user');
-    if (el) el.textContent = getUser().email || '';
-    if (!getToken() && !location.pathname.includes('login')) location.href = '/login';
+    const u = getUser();
+    if (el) el.textContent = u.username || u.email || '';
+    if (!getToken() && !location.pathname.includes('login') && !location.pathname.includes('invite')) location.href = '/login';
 });

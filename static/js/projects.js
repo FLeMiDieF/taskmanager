@@ -1,10 +1,14 @@
 async function loadProjects() {
-    const res = await api('GET', '/api/projects/');
-    const projects = await res.json();
     const grid = document.getElementById('projects-grid');
+    const res = await api('GET', '/api/projects/');
+    if (!res || !res.ok) {
+        grid.innerHTML = '<p class="loading">Ошибка загрузки проектов</p>';
+        return;
+    }
+    const projects = await res.json();
     const me = getUser();
 
-    if (!projects.length) {
+    if (!Array.isArray(projects) || !projects.length) {
         grid.innerHTML = '<p class="loading">Проектов пока нет. Создайте первый!</p>';
         return;
     }
@@ -48,7 +52,11 @@ async function createProject() {
     const errEl = document.getElementById('project-error');
     if (!name) { errEl.textContent = 'Введите название'; errEl.classList.remove('hidden'); return; }
     const res = await api('POST', '/api/projects/', { name, description });
-    if (!res.ok) { errEl.textContent = 'Ошибка создания'; errEl.classList.remove('hidden'); return; }
+    if (!res || !res.ok) {
+        const data = res ? await res.json().catch(() => ({})) : {};
+        errEl.textContent = data.detail || Object.values(data).flat().join(' ') || 'Ошибка создания';
+        errEl.classList.remove('hidden'); return;
+    }
     closeModal('create-project-modal');
     document.getElementById('project-name').value = '';
     document.getElementById('project-desc').value = '';
