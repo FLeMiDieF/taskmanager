@@ -1,4 +1,4 @@
-import uuid
+from uuid import uuid4
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -138,7 +138,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project = self.get_object()
         if request.user != project.owner:
             return Response({"detail": "Только владелец может сбросить ссылку."}, status=status.HTTP_403_FORBIDDEN)
-        import uuid as uuid_mod
-        project.invite_token = uuid_mod.uuid4()
+        project.invite_token = uuid4()
         project.save(update_fields=["invite_token"])
         return Response({"invite_token": str(project.invite_token)})
