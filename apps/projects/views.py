@@ -1,3 +1,4 @@
+import uuid
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -19,9 +20,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        return Project.objects.filter(
-            owner=self.request.user
-        ) | Project.objects.filter(members=self.request.user)
+        qs = (
+            Project.objects.filter(owner=self.request.user) |
+            Project.objects.filter(members=self.request.user)
+        ).distinct()
+        # Поиск по UUID (для board.js)
+        uuid_param = self.request.query_params.get("uuid")
+        if uuid_param:
+            qs = qs.filter(uuid=uuid_param)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -31,6 +38,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Только владелец может удалить проект.")
         instance.delete()
+
+    # ── Участники ────────────────────────────────────────────────
 
     @action(detail=True, methods=["get", "post"], url_path="members")
     def members(self, request, pk=None):
@@ -42,7 +51,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 "members": UserSerializer(project.members.all(), many=True).data,
             })
 
-        # POST — добавить участника (только владелец)
         if request.user != project.owner:
             return Response(
                 {"detail": "Только владелец может добавлять участников."},
@@ -89,3 +97,48 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Вы не являетесь участником этого проекта."}, status=status.HTTP_400_BAD_REQUEST)
         project.members.remove(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── Приглашение по ссылке ─────────────────────────────────────
+
+    @action(detail=False, methods=["get"], url_path=r"invite/(?P<token>[^/.]+)",
+            permission_classes=[permissions.AllowAny])
+    def invite_info(self, request, token=None):
+        """Публичная информация о проекте по инвайт-токену (без авторизации)."""
+        try:
+            project = Project.objects.get(invite_token=token)
+        except (Project.DoesNotExist, Exception):
+            return Response({"detail": "Недействительная ссылка."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            "name": project.name,
+            "description": project.description,
+            "owner": project.owner.username,
+            "members_count": project.members.count() + 1,
+        })
+
+    @action(detail=False, methods=["post"], url_path=r"join/(?P<token>[^/.]+)")
+    def join(self, request, token=None):
+        """Вступить в проект по инвайт-токену."""
+        try:
+            project = Project.objects.get(invite_token=token)
+        except (Project.DoesNotExist, Exception):
+            return Response({"detail": "Недействительная ссылка."}, status=status.HTTP_404_NOT_FOUND)
+        if request.user == project.owner:
+            return Response({"detail": "Вы владелец этого проекта."}, status=status.HTTP_400_BAD_REQUEST)
+        if project.members.filter(id=request.user.id).exists():
+            return Response({"detail": "Вы уже участник этого проекта."}, status=status.HTTP_400_BAD_REQUEST)
+        project.members.add(request.user)
+        return Response({
+            "detail": f"Вы вступили в проект «{project.name}».",
+            "uuid": str(project.uuid),
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="reset-invite")
+    def reset_invite(self, request, pk=None):
+        """Сбросить инвайт-токен (старая ссылка перестанет работать)."""
+        project = self.get_object()
+        if request.user != project.owner:
+            return Response({"detail": "Только владелец может сбросить ссылку."}, status=status.HTTP_403_FORBIDDEN)
+        import uuid as uuid_mod
+        project.invite_token = uuid_mod.uuid4()
+        project.save(update_fields=["invite_token"])
+        return Response({"invite_token": str(project.invite_token)})

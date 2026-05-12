@@ -11,3 +11,7 @@ def projects_view(request):
 
 def board_view(request):
     return render(request, 'board.html')
+
+
+def invite_view(request):
+    return render(request, 'invite.html')

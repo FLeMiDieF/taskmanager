@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Приглашение — TaskManager</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page">
+<div class="auth-box">
+    <h1 class="auth-logo">✅ TaskManager</h1>
+    <p class="auth-sub" id="invite-sub">Загрузка...</p>
+
+    <div id="invite-card" class="invite-info hidden">
+        <div class="invite-project-name" id="invite-project-name"></div>
+        <div class="invite-meta">
+            <span id="invite-owner"></span>
+            <span id="invite-members"></span>
+        </div>
+        <div id="invite-desc" class="invite-desc"></div>
+    </div>
+
+    <div id="invite-error" class="error-msg hidden"></div>
+    <div id="invite-success" class="success-msg hidden"></div>
+
+    <div id="invite-actions" class="hidden" style="margin-top:1.2rem">
+        <button id="join-btn" class="btn btn-primary w-full" onclick="joinProject()">🚀 Вступить в проект</button>
+    </div>
+
+    <div id="login-prompt" class="hidden" style="margin-top:1.2rem; text-align:center">
+        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:0.8rem">Чтобы вступить, войдите в аккаунт</p>
+        <button class="btn btn-primary w-full" onclick="goLogin()">Войти / Зарегистрироваться</button>
+    </div>
+</div>
+
+<script>
+const token = new URLSearchParams(location.search).get('token');
+
+async function loadInvite() {
+    if (!token) { showError('Неверная ссылка.'); return; }
+
+    const res = await fetch(`/api/projects/invite/${token}/`);
+    const data = await res.json();
+
+    if (!res.ok) { showError(data.detail || 'Ссылка недействительна.'); return; }
+
+    document.getElementById('invite-sub').textContent = 'Вас пригласили в проект';
+    document.getElementById('invite-project-name').textContent = data.name;
+    document.getElementById('invite-owner').textContent = `👤 ${data.owner}`;
+    document.getElementById('invite-members').textContent = `👥 ${data.members_count} участников`;
+    if (data.description) {
+        document.getElementById('invite-desc').textContent = data.description;
+    }
+    document.getElementById('invite-card').classList.remove('hidden');
+
+    const access = localStorage.getItem('access');
+    if (access) {
+        document.getElementById('invite-actions').classList.remove('hidden');
+    } else {
+        document.getElementById('login-prompt').classList.remove('hidden');
+    }
+}
+
+async function joinProject() {
+    const btn = document.getElementById('join-btn');
+    btn.disabled = true;
+    btn.textContent = 'Вступаю...';
+
+    const res = await fetch(`/api/projects/join/${token}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + localStorage.getItem('access'),
+        }
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+        document.getElementById('invite-error').textContent = data.detail || 'Ошибка';
+        document.getElementById('invite-error').classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = '🚀 Вступить в проект';
+        return;
+    }
+
+    document.getElementById('invite-success').textContent = data.detail;
+    document.getElementById('invite-success').classList.remove('hidden');
+    document.getElementById('invite-actions').classList.add('hidden');
+
+    setTimeout(() => {
+        location.href = `/board?project=${data.uuid}`;
+    }, 1200);
+}
+
+function goLogin() {
+    localStorage.setItem('invite_return', location.href);
+    location.href = '/login';
+}
+
+function showError(msg) {
+    document.getElementById('invite-sub').textContent = 'Ошибка';
+    document.getElementById('invite-error').textContent = msg;
+    document.getElementById('invite-error').classList.remove('hidden');
+}
+
+// После логина — вернуться на инвайт
+const returnUrl = localStorage.getItem('invite_return');
+if (returnUrl && location.pathname !== '/login') {
+    localStorage.removeItem('invite_return');
+}
+
+loadInvite();
+</script>
+</body>
+</html>

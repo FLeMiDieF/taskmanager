@@ -1,23 +1,27 @@
-const projectId = new URLSearchParams(location.search).get('project');
+const projectUuid = new URLSearchParams(location.search).get('project');
+let projectId = null;       // integer ID для API задач
+let projectInviteToken = null;
 let currentTaskId = null;
-let projectMembers = [];   // [{id, username, email}, ...]
-let projectOwner = null;   // {id, username, email}
+let projectMembers = [];
+let projectOwner = null;
 
 // ─── Инициализация ────────────────────────────────────────────────
 
 async function loadProject() {
-    const res = await api('GET', `/api/projects/${projectId}/`);
-    if (!res.ok) {
-        // Нет доступа или проект не существует — редирект на главную
-        location.href = '/';
-        return;
-    }
-    const p = await res.json();
+    // Ищем проект по UUID
+    const res = await api('GET', `/api/projects/?uuid=${projectUuid}`);
+    if (!res.ok) { location.href = '/'; return; }
+    const list = await res.json();
+    if (!list.length) { location.href = '/'; return; }
+    const p = list[0];
+    projectId = p.id;
+    projectInviteToken = p.invite_token || null;
     document.getElementById('project-title').textContent = p.name;
     document.title = p.name + ' — TaskManager';
 }
 
 async function loadMembers() {
+    if (!projectId) return;
     const res = await api('GET', `/api/projects/${projectId}/members/`);
     if (!res.ok) return;
     const data = await res.json();
@@ -86,6 +90,21 @@ function renderMembersModal() {
     // Кнопка "Покинуть" — только для участников (не владелец)
     const isMember = me && projectMembers.some(u => u.id === me.id);
     document.getElementById('leave-btn').classList.toggle('hidden', !isMember);
+
+    // Кнопка копирования инвайт-ссылки (только владелец)
+    const copyBtn = document.getElementById('copy-invite-btn');
+    if (copyBtn) copyBtn.classList.toggle('hidden', !isOwner);
+}
+
+function copyInviteLink() {
+    if (!projectInviteToken) return;
+    const link = `${location.origin}/invite?token=${projectInviteToken}`;
+    navigator.clipboard.writeText(link).then(() => {
+        const btn = document.getElementById('copy-invite-btn');
+        const orig = btn.textContent;
+        btn.textContent = '✅ Скопировано!';
+        setTimeout(() => btn.textContent = orig, 2000);
+    });
 }
 
 function populateAssigneeSelects() {
@@ -262,13 +281,16 @@ document.querySelectorAll('.col-body').forEach(col => {
 
 // ─── Старт ────────────────────────────────────────────────────────
 
-window.addEventListener('DOMContentLoaded', () => {
-    if (!projectId) { location.href = '/'; return; }
+window.addEventListener('DOMContentLoaded', async () => {
+    if (!projectUuid) { location.href = '/'; return; }
 
     const user = getUser();
     if (user) document.getElementById('nav-user').textContent = user.username || user.email;
 
-    loadProject();
+    // Сначала грузим проект (получаем integer id), потом всё остальное
+    await loadProject();
+    if (!projectId) return; // редирект уже произошёл
+
     loadMembers();
     loadTasks();
 

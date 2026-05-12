@@ -178,6 +178,12 @@ body { background: var(--bg); color: var(--text); font-family: Arial, sans-serif
 .invite-row input { flex: 1; padding: 0.5rem 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.9rem; }
 .invite-row input:focus { outline: none; border-color: var(--primary); }
 
+/* Invite page */
+.invite-info { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; margin-bottom: 1rem; }
+.invite-project-name { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.5rem; }
+.invite-meta { display: flex; gap: 1rem; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+.invite-desc { font-size: 0.85rem; color: var(--text-muted); }
+
 /* Task assignee row in view modal */
 .task-assignee-row { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.8rem; padding: 0.6rem 0.8rem; background: var(--bg); border-radius: var(--radius); }
 .assignee-label { font-size: 0.85rem; color: var(--text-muted); }

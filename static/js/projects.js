@@ -12,7 +12,7 @@ async function loadProjects() {
     grid.innerHTML = projects.map(p => {
         const isOwner = me && p.owner.id === me.id;
         return `
-        <div class="project-card" onclick="location.href='/board?project=${p.id}'">
+        <div class="project-card" onclick="location.href='/board?project=${p.uuid}'">
             <h2>${p.name}</h2>
             <p>${p.description || 'Без описания'}</p>
             <div class="project-card-footer">

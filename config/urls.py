@@ -4,13 +4,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from .views import login_view, projects_view, board_view
+from .views import login_view, projects_view, board_view, invite_view
 
 urlpatterns = [
     # HTML страницы
     path("", projects_view, name="projects"),
     path("login", login_view, name="login"),
     path("board", board_view, name="board"),
+    path("invite", invite_view, name="invite"),
     # Admin
     path("admin/", admin.site.urls),
     # API docs
