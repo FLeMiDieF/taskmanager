@@ -1,8 +1,21 @@
 from rest_framework import viewsets, permissions, filters
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Task
 from .serializers import TaskSerializer
 from apps.notifications.tasks import notify_task_update
+from apps.projects.models import Project
+
+
+def _check_project_access(user, project_id):
+    """Проверяет, является ли пользователь владельцем или участником проекта."""
+    try:
+        project = Project.objects.get(id=project_id)
+    except Project.DoesNotExist:
+        raise ValidationError({"project": "Проект не найден."})
+    if project.owner != user and not project.members.filter(id=user.id).exists():
+        raise PermissionDenied("У вас нет доступа к этому проекту.")
+    return project
 
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -19,6 +32,15 @@ class TaskViewSet(viewsets.ModelViewSet):
             project__members=self.request.user
         )
 
+    def perform_create(self, serializer):
+        project_id = self.request.data.get("project")
+        _check_project_access(self.request.user, project_id)
+        serializer.save()
+
     def perform_update(self, serializer):
         task = serializer.save()
         notify_task_update.delay(task.id)
+
+    def perform_destroy(self, instance):
+        _check_project_access(self.request.user, instance.project_id)
+        instance.delete()

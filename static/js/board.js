@@ -7,6 +7,11 @@ let projectOwner = null;   // {id, username, email}
 
 async function loadProject() {
     const res = await api('GET', `/api/projects/${projectId}/`);
+    if (!res.ok) {
+        // Нет доступа или проект не существует — редирект на главную
+        location.href = '/';
+        return;
+    }
     const p = await res.json();
     document.getElementById('project-title').textContent = p.name;
     document.title = p.name + ' — TaskManager';
