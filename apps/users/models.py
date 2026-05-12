@@ -3,11 +3,11 @@ from django.db import models
 
 
 class User(AbstractUser):
-    email = models.EmailField(unique=True)
+    email = models.EmailField(blank=True, null=True, unique=True, default=None)
     bio = models.TextField(blank=True)
 
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["username"]
+    USERNAME_FIELD = "username"
+    REQUIRED_FIELDS = []
 
     def __str__(self):
-        return self.email
+        return self.username
