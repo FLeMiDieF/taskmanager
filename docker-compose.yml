@@ -31,7 +31,8 @@ services:
     command: >
       sh -c "python manage.py makemigrations users projects tasks notifications &&
              python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     env_file: .env
     volumes:
       - .:/app

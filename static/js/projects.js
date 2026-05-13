@@ -1,3 +1,5 @@
+console.log('[projects.js] загружен v2');
+
 async function loadProjects() {
     const grid = document.getElementById('projects-grid');
     const res = await api('GET', '/api/projects/');
@@ -63,4 +65,22 @@ async function createProject() {
     loadProjects();
 }
 
-window.addEventListener('DOMContentLoaded', loadProjects);
+window.addEventListener('DOMContentLoaded', () => {
+    loadProjects();
+
+    const user = getUser();
+    if (!user) return;
+
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let ws;
+
+    function connectWs() {
+        ws = new WebSocket(`${wsProtocol}//${location.host}/ws/users/${user.id}/`);
+        ws.onopen = () => console.log('[WS] подключён, user_id=' + user.id);
+        ws.onmessage = () => { console.log('[WS] получено сообщение'); loadProjects(); };
+        ws.onerror = (e) => console.error('[WS] ошибка', e);
+        ws.onclose = () => { console.log('[WS] отключён, переподключение...'); setTimeout(connectWs, 3000); };
+    }
+
+    connectWs();
+});

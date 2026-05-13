@@ -6,25 +6,45 @@ from channels.layers import get_channel_layer
 
 
 @shared_task
-def notify_task_update(task_id):
+def notify_task_update(task_id, project_id=None):
     from apps.tasks.models import Task
     try:
         task = Task.objects.select_related("assignee", "project").get(id=task_id)
+        data = {
+            "task_id": task.id,
+            "title": task.title,
+            "status": task.status,
+            "assignee": task.assignee.email if task.assignee else None,
+        }
+        group = f"project_{task.project_id}"
     except Task.DoesNotExist:
-        return
+        if not project_id:
+            return
+        data = {"task_id": task_id, "deleted": True}
+        group = f"project_{project_id}"
 
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
-        f"project_{task.project_id}",
-        {
-            "type": "task_update",
-            "data": {
-                "task_id": task.id,
-                "title": task.title,
-                "status": task.status,
-                "assignee": task.assignee.email if task.assignee else None,
-            },
-        },
+        group,
+        {"type": "task_update", "data": data},
+    )
+
+
+@shared_task
+def notify_user_project_update(user_id):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"user_{user_id}",
+        {"type": "project_update", "data": {}},
+    )
+
+
+@shared_task
+def notify_member_update(project_id):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"project_{project_id}",
+        {"type": "member_update", "data": {"project_id": project_id}},
     )
 
 

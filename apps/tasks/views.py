@@ -35,12 +35,21 @@ class TaskViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         project_id = self.request.data.get("project")
         _check_project_access(self.request.user, project_id)
-        serializer.save()
+        task = serializer.save()
+        notify_task_update.delay(task.id)
 
     def perform_update(self, serializer):
+        project = serializer.instance.project
+        if not project.is_admin(self.request.user):
+            raise PermissionDenied("Только админ или владелец может изменять задачи.")
         task = serializer.save()
         notify_task_update.delay(task.id)
 
     def perform_destroy(self, instance):
-        _check_project_access(self.request.user, instance.project_id)
+        project = instance.project
+        if not project.is_admin(self.request.user):
+            raise PermissionDenied("Только админ или владелец может удалять задачи.")
+        project_id = instance.project_id
+        task_id = instance.id
         instance.delete()
+        notify_task_update.delay(task_id, project_id)

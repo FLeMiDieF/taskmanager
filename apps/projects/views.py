@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from .models import Project
 from .serializers import ProjectSerializer
 from apps.users.serializers import UserSerializer
+from apps.notifications.tasks import notify_member_update, notify_user_project_update
 
 User = get_user_model()
 
@@ -49,6 +50,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({
                 "owner": UserSerializer(project.owner).data,
                 "members": UserSerializer(project.members.all(), many=True).data,
+                "admin_ids": list(project.admins.values_list("id", flat=True)),
             })
 
         if request.user != project.owner:
@@ -68,6 +70,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if project.members.filter(id=user.id).exists():
             return Response({"detail": "Пользователь уже является участником."}, status=status.HTTP_400_BAD_REQUEST)
         project.members.add(user)
+        notify_member_update.delay(project.id)
+        notify_user_project_update.delay(user.id)
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["delete"], url_path=r"members/(?P<user_id>[^/.]+)")
@@ -83,6 +87,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
         project.members.remove(user)
+        project.admins.remove(user)
+        notify_member_update.delay(project.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"], url_path="leave")
@@ -96,6 +102,35 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not project.members.filter(id=request.user.id).exists():
             return Response({"detail": "Вы не являетесь участником этого проекта."}, status=status.HTTP_400_BAD_REQUEST)
         project.members.remove(request.user)
+        project.admins.remove(request.user)
+        notify_member_update.delay(project.id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── Админы ───────────────────────────────────────────────────
+
+    @action(detail=True, methods=["post", "delete"], url_path=r"admins/(?P<user_id>[^/.]+)")
+    def manage_admin(self, request, pk=None, user_id=None):
+        """POST — выдать админку, DELETE — снять. Только владелец."""
+        project = self.get_object()
+        if request.user != project.owner:
+            return Response(
+                {"detail": "Только владелец может управлять админами."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if user == project.owner:
+            return Response({"detail": "Владелец и так имеет полные права."}, status=status.HTTP_400_BAD_REQUEST)
+        if not project.members.filter(id=user.id).exists():
+            return Response({"detail": "Пользователь не является участником."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if request.method == "POST":
+            project.admins.add(user)
+        else:
+            project.admins.remove(user)
+        notify_member_update.delay(project.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # ── Приглашение по ссылке ─────────────────────────────────────

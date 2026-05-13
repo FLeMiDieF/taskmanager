@@ -4,6 +4,13 @@ let projectInviteToken = null;
 let currentTaskId = null;
 let projectMembers = [];
 let projectOwner = null;
+let projectAdminIds = [];
+
+function isCurrentUserAdmin() {
+    const me = getUser();
+    if (!me || !projectOwner) return false;
+    return me.id === projectOwner.id || projectAdminIds.includes(me.id);
+}
 
 // ─── Инициализация ────────────────────────────────────────────────
 
@@ -27,9 +34,19 @@ async function loadMembers() {
     const data = await res.json();
     projectOwner = data.owner;
     projectMembers = data.members;
+    projectAdminIds = data.admin_ids || [];
     renderMemberAvatars();
     renderMembersModal();
     populateAssigneeSelects();
+    applyRoleUI();
+}
+
+function applyRoleUI() {
+    const admin = isCurrentUserAdmin();
+    // Кнопка "+ Новая задача"
+    document.querySelectorAll('[onclick="openCreateTask()"]').forEach(b => b.classList.toggle('hidden', !admin));
+    // Включить/выключить drag-and-drop
+    document.querySelectorAll('.task-card').forEach(c => c.draggable = admin);
 }
 
 // ─── Аватары в navbar ─────────────────────────────────────────────
@@ -68,21 +85,33 @@ function renderMembersModal() {
     const list = document.getElementById('members-list');
     const all = projectOwner ? [{ ...projectOwner, _owner: true }, ...projectMembers] : projectMembers;
 
-    list.innerHTML = all.map(u => `
-        <div class="member-row">
-            <div class="member-avatar-sm" style="background:${avatarColor(u)}">${avatarInitials(u)}</div>
-            <div class="member-info">
-                <span class="member-name">${u.username}</span>
-                <span class="member-email">${u.email}</span>
+    list.innerHTML = all.map(u => {
+        const isAdmin = projectAdminIds.includes(u.id);
+        let badge;
+        if (u._owner) badge = '<span class="role-badge role-owner">Владелец</span>';
+        else if (isAdmin) badge = '<span class="role-badge role-owner">Админ</span>';
+        else badge = '<span class="role-badge role-member">Участник</span>';
+
+        let actions = '';
+        if (isOwner && !u._owner) {
+            actions += isAdmin
+                ? `<button class="btn btn-outline btn-sm" onclick="toggleAdmin(${u.id}, false)">Снять админа</button>`
+                : `<button class="btn btn-outline btn-sm" onclick="toggleAdmin(${u.id}, true)">Сделать админом</button>`;
+            actions += `<button class="btn btn-danger btn-sm" onclick="removeMember(${u.id})">✕</button>`;
+        }
+
+        return `
+            <div class="member-row">
+                <div class="member-avatar-sm" style="background:${avatarColor(u)}">${avatarInitials(u)}</div>
+                <div class="member-info">
+                    <span class="member-name">${u.username}</span>
+                    <span class="member-email">${u.email}</span>
+                </div>
+                <div class="member-badges">${badge}</div>
+                ${actions}
             </div>
-            <div class="member-badges">
-                ${u._owner ? '<span class="role-badge role-owner">Владелец</span>' : '<span class="role-badge role-member">Участник</span>'}
-            </div>
-            ${isOwner && !u._owner
-                ? `<button class="btn btn-danger btn-sm" onclick="removeMember(${u.id})">✕</button>`
-                : ''}
-        </div>
-    `).join('') || '<p class="empty-col">Участников пока нет</p>';
+        `;
+    }).join('') || '<p class="empty-col">Участников пока нет</p>';
 
     // Показать/скрыть секцию приглашения (только владелец)
     document.getElementById('invite-section').classList.toggle('hidden', !isOwner);
@@ -154,6 +183,12 @@ async function removeMember(userId) {
     if (res.ok) await loadMembers();
 }
 
+async function toggleAdmin(userId, makeAdmin) {
+    const method = makeAdmin ? 'POST' : 'DELETE';
+    const res = await api(method, `/api/projects/${projectId}/admins/${userId}/`);
+    if (res.ok) await loadMembers();
+}
+
 function openCreateTask() {
     document.getElementById('task-title').value = '';
     document.getElementById('task-desc').value = '';
@@ -188,7 +223,7 @@ async function loadTasks() {
         if (!col) return;
         const card = document.createElement('div');
         card.className = 'task-card';
-        card.draggable = true;
+        card.draggable = isCurrentUserAdmin();
         card.dataset.id = task.id;
 
         const assigneeHtml = task.assignee
@@ -213,23 +248,65 @@ async function loadTasks() {
 
 function openTask(task) {
     currentTaskId = task.id;
-    document.getElementById('view-task-title').textContent = task.title;
-    document.getElementById('view-task-desc').textContent = task.description || 'Описание отсутствует';
-    document.getElementById('view-task-priority').outerHTML = priorityBadge(task.priority);
-    document.getElementById('view-task-deadline').innerHTML = formatDeadline(task.deadline);
+    document.getElementById('edit-task-title').value = task.title || '';
+    document.getElementById('edit-task-desc').value = task.description || '';
+    document.getElementById('edit-task-priority').value = task.priority || 'medium';
 
-    const assigneeRow = document.getElementById('view-task-assignee');
-    if (task.assignee) {
-        assigneeRow.classList.remove('hidden');
-        assigneeRow.innerHTML = `
-            <div class="member-avatar-sm" style="background:${avatarColor(task.assignee)}">${avatarInitials(task.assignee)}</div>
-            <span class="assignee-label">Исполнитель: <strong>${task.assignee.username}</strong> (${task.assignee.email})</span>
-        `;
+    // datetime-local требует формат YYYY-MM-DDTHH:MM (без секунд/таймзоны)
+    if (task.deadline) {
+        const d = new Date(task.deadline);
+        const pad = n => String(n).padStart(2, '0');
+        const local = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        document.getElementById('edit-task-deadline').value = local;
     } else {
-        assigneeRow.classList.add('hidden');
+        document.getElementById('edit-task-deadline').value = '';
     }
 
+    document.getElementById('edit-task-assignee').value = task.assignee ? task.assignee.id : '';
+    document.getElementById('edit-task-error').classList.add('hidden');
+
+    // Read-only режим для не-админов
+    const admin = isCurrentUserAdmin();
+    ['edit-task-title','edit-task-desc','edit-task-priority','edit-task-deadline','edit-task-assignee']
+        .forEach(id => document.getElementById(id).disabled = !admin);
+    document.querySelectorAll('#view-task-modal [onclick="saveTask()"], #view-task-modal [onclick="deleteCurrentTask()"]')
+        .forEach(b => b.classList.toggle('hidden', !admin));
+
     openModal('view-task-modal');
+}
+
+async function saveTask() {
+    if (!currentTaskId) return;
+    const title = document.getElementById('edit-task-title').value.trim();
+    const description = document.getElementById('edit-task-desc').value.trim();
+    const priority = document.getElementById('edit-task-priority').value;
+    const deadline = document.getElementById('edit-task-deadline').value;
+    const assigneeId = document.getElementById('edit-task-assignee').value;
+    const errEl = document.getElementById('edit-task-error');
+
+    if (!title) {
+        errEl.textContent = 'Введите название';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const body = {
+        title,
+        description,
+        priority,
+        deadline: deadline ? new Date(deadline).toISOString() : null,
+        assignee_id: assigneeId ? parseInt(assigneeId) : null,
+    };
+
+    const res = await api('PATCH', `/api/tasks/${currentTaskId}/`, body);
+    if (!res.ok) {
+        errEl.textContent = 'Ошибка сохранения';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    closeModal('view-task-modal');
+    loadTasks();
 }
 
 async function deleteCurrentTask() {
@@ -270,6 +347,7 @@ function allowDrop(e) {
 async function dropTask(e, status) {
     e.preventDefault();
     e.currentTarget.classList.remove('drag-over');
+    if (!isCurrentUserAdmin()) return;
     const taskId = e.dataTransfer.getData('text/plain');
     await api('PATCH', `/api/tasks/${taskId}/`, { status });
     loadTasks();
@@ -295,6 +373,27 @@ window.addEventListener('DOMContentLoaded', async () => {
     loadTasks();
 
     // WebSocket для real-time обновлений
-    const ws = new WebSocket(`ws://${location.host}/ws/projects/${projectId}/tasks/`);
-    ws.onmessage = () => loadTasks();
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let ws;
+
+    function connectWs() {
+        ws = new WebSocket(`${wsProtocol}//${location.host}/ws/projects/${projectId}/tasks/`);
+        ws.onmessage = (e) => {
+            try {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'member_update') {
+                    loadMembers();
+                } else if (msg.deleted) {
+                    document.querySelector(`.task-card[data-id="${msg.task_id}"]`)?.remove();
+                } else {
+                    loadTasks();
+                }
+            } catch {
+                loadTasks();
+            }
+        };
+        ws.onclose = () => setTimeout(connectWs, 3000);
+    }
+
+    connectWs();
 });
